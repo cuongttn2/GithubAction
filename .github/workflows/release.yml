@@ -43,17 +43,41 @@ jobs:
           mkdir -p app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore.jks
 
-      - name: Build and Sign APK
+      - name: Verify keystore file
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "Keystore file size: $(wc -c < app/keystore.jks)"
+          keytool -list -v -keystore app/keystore.jks -storepass $KEYSTORE_PASSWORD -alias $KEY_ALIAS || echo "Keystore verification failed"
+
+      - name: Build Release APK (unsigned)
+        run: ./gradlew assembleRelease
+
+      - name: Sign APK manually
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
-            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+          # Copy unsigned APK
+          cp app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/app-release-temp.apk
+          
+          # Sign APK
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore app/keystore.jks \
+            -storepass $KEYSTORE_PASSWORD \
+            -keypass $KEY_PASSWORD \
+            app/build/outputs/apk/release/app-release-temp.apk \
+            $KEY_ALIAS
+          
+          # Align APK
+          zipalign -v 4 \
+            app/build/outputs/apk/release/app-release-temp.apk \
+            app/build/outputs/apk/release/app-release.apk
+          
+          # Clean up temp file
+          rm app/build/outputs/apk/release/app-release-temp.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
