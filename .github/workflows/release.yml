@@ -16,10 +16,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: set up JDK 11
+      - name: set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '11'
+          java-version: '17'
           distribution: 'temurin'
           cache: gradle
 
@@ -59,7 +59,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3 # Necessary to access local action
+      - uses: actions/checkout@v4 # Necessary to access local action
       - name: github-action-release-apk
         uses: gogoadl/github-action-release-apk@v1.0.0-alpha09
         with:
